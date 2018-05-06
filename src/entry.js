@@ -43,15 +43,16 @@ let options = {
     x: 2,
     y: 2,
     z: 2
-  }
+  },
+  splatSizes: [0.5, 0.75, 1, 1.5, 2]
 };
 
-// let disk = gui.addFolder('Splats');
-// disk.add(options.disk, 'radius', 0.1, 4);
-// // disk.add(options.disk.orientation, 'x', -1, 1).listen();
-// // disk.add(options.disk.orientation, 'y', -1, 1).listen();
-// // disk.add(options.disk.orientation, 'z', -1, 1).listen();
-// disk.open();
+let disk = gui.addFolder('Splats');
+disk.add(options.disk, 'radius', {"ver smol": 0.5, "smol": 0.75, "normal": 1, "big": 1.5, "ver big": 2});
+// disk.add(options.disk.orientation, 'x', -1, 1).listen();
+// disk.add(options.disk.orientation, 'y', -1, 1).listen();
+// disk.add(options.disk.orientation, 'z', -1, 1).listen();
+disk.open();
 
 let rendering = gui.addFolder("Rendering");
 let renderMode = rendering.add(options.rendering, 'mode', ["normal", "point light"]);

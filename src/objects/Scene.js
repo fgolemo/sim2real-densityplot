@@ -5,13 +5,12 @@ export default class SplatScene extends Group {
   constructor(options, renderMode) {
     super();
     this.options = options;
-    this.meshes = [];
+    this.meshesNorm = [];
+    this.meshesLit = [];
 
     this.oldRadius = this.options.disk.radius;
+    this.oldRendermode = this.options.rendering.mode;
     this.oldBackground = this.options.rendering.background;
-
-    this.changeRenderMode = this.changeRenderMode.bind(this);
-    renderMode.onFinishChange(this.changeRenderMode);
 
     this.addBackground();
     this.changeBackground();
@@ -44,11 +43,12 @@ export default class SplatScene extends Group {
 
   }
 
-  changeRenderMode(mode) {
-    if (mode == "normal") {
-      this.changeMatIndex(0);
+  changeVisibility(scale, mode) {
+    this.turnAllOff();
+    if (mode === "normal") {
+      this.meshesNorm[scale].visible = true;
     } else {
-      this.changeMatIndex(1);
+      this.meshesLit[scale].visible = true;
     }
   }
 
@@ -58,9 +58,11 @@ export default class SplatScene extends Group {
     }));
   }
 
-  changeMatIndex(matIndex) {
-    this.meshes[matIndex].visible = true;
-    this.meshes[1-matIndex].visible = false;
+  turnAllOff() {
+    for (let i in this.meshesNorm) {
+      this.meshesNorm[i].visible = false;
+      this.meshesLit[i].visible = false;
+    }
   }
 
   normalizeSplats(splatList) {
@@ -126,36 +128,41 @@ export default class SplatScene extends Group {
     this.clearAllSplats();
 
     let geo = new THREE.Geometry();
+    let normalizedSplats = this.normalizeSplats(splatList);
 
-    this.normalizeSplats(splatList).forEach((line => {
-        let splat = this.createSplat(
-          line[0], line[1], line[2],
-          line[3], line[4], line[5]
-        );
+    for (let i in this.options.splatSizes) {
+      normalizedSplats.forEach((line => {
+          let splat = this.createSplat(
+            line[0], line[1], line[2],
+            line[3], line[4], line[5],
+            this.options.splatSizes[i]
+          );
 
-        geo.merge(splat);
-      }
-    ));
+          geo.merge(splat);
+        }
+      ));
 
-    let buf = new THREE.BufferGeometry().fromGeometry(geo);
-    let matNormal = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: THREE.FaceColors});
-    let matLit = new THREE.MeshLambertMaterial({color: 0x888888, side: THREE.DoubleSide});
+      let buf = new THREE.BufferGeometry().fromGeometry(geo);
+      let matNormal = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: THREE.FaceColors});
+      let matLit = new THREE.MeshLambertMaterial({color: 0x888888, side: THREE.DoubleSide});
 
-    let meshNormal = new THREE.Mesh(buf, matNormal);
-    let meshLit = new THREE.Mesh(buf, matLit);
+      let meshNormal = new THREE.Mesh(buf, matNormal);
+      let meshLit = new THREE.Mesh(buf, matLit);
 
-    this.add(meshNormal);
-    this.add(meshLit);
+      this.add(meshNormal);
+      this.add(meshLit);
 
-    this.meshes.push(meshNormal);
-    this.meshes.push(meshLit);
+      this.meshesNorm[this.options.splatSizes[i].toString()] = meshNormal;
+      this.meshesLit[this.options.splatSizes[i].toString()] = meshLit;
+    }
 
-    console.log("loaded " + splatList.length + " splats");
-    this.changeRenderMode(this.options.rendering.mode);
+
+    console.log("loaded " + normalizedSplats.length + " splats");
+    this.changeVisibility(this.options.disk.radius, this.options.rendering.mode);
   }
 
-  createSplat(x, y, z, normX, normY, normZ) {
-    let geometry = new THREE.CircleGeometry(0.005, 6);
+  createSplat(x, y, z, normX, normY, normZ, scale) {
+    let geometry = new THREE.CircleGeometry(0.005 * scale, 6);
     geometry.lookAt(new THREE.Vector3(normX, normY, normZ));
     geometry.translate(x, y, z);
 
@@ -168,8 +175,10 @@ export default class SplatScene extends Group {
   }
 
   clearAllSplats() {
-    this.meshes.forEach((mesh => this.remove(mesh)));
-    this.meshes = [];
+    this.meshesNorm.forEach((mesh => this.remove(mesh)));
+    this.meshesLit.forEach((mesh => this.remove(mesh)));
+    this.meshesNorm = [];
+    this.meshesLit = [];
   }
 
   rgb2hex(red, green, blue) {
@@ -192,11 +201,10 @@ export default class SplatScene extends Group {
   update(timeStamp) {
     // this.rotation.y = timeStamp / 10000;
 
-    if (this.oldRadius !== this.options.disk.radius) {
-      this.splats.forEach((splat => {
-        splat.scale.set(this.options.disk.radius, this.options.disk.radius, this.options.disk.radius);
-      }));
+    if (this.oldRadius !== this.options.disk.radius || this.oldRendermode !== this.options.rendering.mode) {
+      this.changeVisibility(this.options.disk.radius, this.options.rendering.mode);
       this.oldRadius = this.options.disk.radius;
+      this.oldRendermode = this.options.rendering.mode;
     }
 
     if (this.oldBackground !== this.options.rendering.background) {
