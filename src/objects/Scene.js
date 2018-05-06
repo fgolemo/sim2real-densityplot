@@ -5,7 +5,7 @@ export default class SplatScene extends Group {
   constructor(options, renderMode) {
     super();
     this.options = options;
-    this.splats = [];
+    this.meshes = [];
 
     this.oldRadius = this.options.disk.radius;
     this.oldBackground = this.options.rendering.background;
@@ -20,7 +20,7 @@ export default class SplatScene extends Group {
   makePlane(geo, mat, pos, rot) {
     let plane = new THREE.Mesh(geo, mat);
     plane.position.set(pos.x, pos.y, pos.z);
-    let normal = this.getNormal(plane, {x: rot.x, y: rot.y, z: rot.z});
+    let normal = this.getNormal(pos, rot);
     plane.lookAt(normal);
     plane.castShadow = false;
     plane.receiveShadow = true;
@@ -59,12 +59,8 @@ export default class SplatScene extends Group {
   }
 
   changeMatIndex(matIndex) {
-    this.splats.forEach((splat => {
-      for (let i = 0; i < splat.geometry.faces.length; i++) {
-        splat.geometry.faces[i].materialIndex = matIndex;
-      }
-      splat.geometry.groupsNeedUpdate = true;
-    }));
+    this.meshes[matIndex].visible = true;
+    this.meshes[1-matIndex].visible = false;
   }
 
   normalizeSplats(splatList) {
@@ -129,42 +125,51 @@ export default class SplatScene extends Group {
   updateSplats(splatList) {
     this.clearAllSplats();
 
+    let geo = new THREE.Geometry();
+
     this.normalizeSplats(splatList).forEach((line => {
-        this.createSplat(
-          line[0],
-          line[1],
-          line[2],
-          line[3],
-          line[4],
-          line[5]
+        let splat = this.createSplat(
+          line[0], line[1], line[2],
+          line[3], line[4], line[5]
         );
+
+        geo.merge(splat);
       }
     ));
+
+    let buf = new THREE.BufferGeometry().fromGeometry(geo);
+    let matNormal = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: THREE.FaceColors});
+    let matLit = new THREE.MeshLambertMaterial({color: 0x888888, side: THREE.DoubleSide});
+
+    let meshNormal = new THREE.Mesh(buf, matNormal);
+    let meshLit = new THREE.Mesh(buf, matLit);
+
+    this.add(meshNormal);
+    this.add(meshLit);
+
+    this.meshes.push(meshNormal);
+    this.meshes.push(meshLit);
+
     console.log("loaded " + splatList.length + " splats");
     this.changeRenderMode(this.options.rendering.mode);
   }
 
   createSplat(x, y, z, normX, normY, normZ) {
-    this.geometry = new THREE.CircleGeometry(0.005, 6);
-    let color = this.normalToColor(normX, normY, normZ);
-    // console.log(color);
-    let materials = [
-      new THREE.MeshBasicMaterial({color: color, side: THREE.DoubleSide}),
-      new THREE.MeshLambertMaterial({color: 0x888888, side: THREE.DoubleSide})
-    ];
-    let splat = new THREE.Mesh(this.geometry, materials);
-    splat.position.set(x, y, z);
-    let normal = this.getNormal(splat, {x: normX, y: normY, z: normZ});
-    splat.lookAt(normal);
-    splat.castShadow = true;
-    splat.receiveShadow = false;
-    this.add(splat);
-    this.splats.push(splat);
+    let geometry = new THREE.CircleGeometry(0.005, 6);
+    geometry.lookAt(new THREE.Vector3(normX, normY, normZ));
+    geometry.translate(x, y, z);
+
+    for (let i in geometry.faces) {
+      geometry.faces[i].color = this.normalToColor2(normX, normY, normZ);
+    }
+    // splat.castShadow = true;
+    // splat.receiveShadow = false;
+    return geometry;
   }
 
   clearAllSplats() {
-    this.splats.forEach((splat => this.remove(splat)));
-    this.splats = [];
+    this.meshes.forEach((mesh => this.remove(mesh)));
+    this.meshes = [];
   }
 
   rgb2hex(red, green, blue) {
@@ -178,6 +183,10 @@ export default class SplatScene extends Group {
       Math.round(Math.abs(normY) * 255),
       Math.round(Math.abs(normZ) * 255)
     )
+  }
+
+  normalToColor2(x, y, z) {
+    return new THREE.Color(Math.abs(x), Math.abs(y), Math.abs(z));
   }
 
   update(timeStamp) {
@@ -197,10 +206,10 @@ export default class SplatScene extends Group {
 
   }
 
-  getNormal(splat, normal) {
+  getNormal(pos, normal) {
     return new THREE.Vector3(
-      splat.position.x + normal.x,
-      splat.position.y + normal.y,
-      splat.position.z + normal.z)
+      pos.x + normal.x,
+      pos.y + normal.y,
+      pos.z + normal.z)
   }
 }

@@ -46,12 +46,12 @@ let options = {
   }
 };
 
-let disk = gui.addFolder('Splats');
-disk.add(options.disk, 'radius', 0.1, 4);
-// disk.add(options.disk.orientation, 'x', -1, 1).listen();
-// disk.add(options.disk.orientation, 'y', -1, 1).listen();
-// disk.add(options.disk.orientation, 'z', -1, 1).listen();
-disk.open();
+// let disk = gui.addFolder('Splats');
+// disk.add(options.disk, 'radius', 0.1, 4);
+// // disk.add(options.disk.orientation, 'x', -1, 1).listen();
+// // disk.add(options.disk.orientation, 'y', -1, 1).listen();
+// // disk.add(options.disk.orientation, 'z', -1, 1).listen();
+// disk.open();
 
 let rendering = gui.addFolder("Rendering");
 let renderMode = rendering.add(options.rendering, 'mode', ["normal", "point light"]);
