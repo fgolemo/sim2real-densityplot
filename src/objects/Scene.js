@@ -220,4 +220,15 @@ export default class SplatScene extends Group {
       pos.y + normal.y,
       pos.z + normal.z)
   }
+
+  rotate180() {
+    for (let i in this.meshesNorm) {
+      this.rotateMesh180(this.meshesNorm[i]);
+      this.rotateMesh180(this.meshesLit[i]);
+    }
+  }
+
+  rotateMesh180(mesh){
+    mesh.rotateZ(Math.PI);
+  }
 }

@@ -71,6 +71,9 @@ light.open();
 let splatScene = new SplatScene(options, renderMode);
 scene.add(splatScene);
 scene.add(new THREE.AxesHelper(20));
+let sai = gui.addFolder("Rotate to make Sai happy");
+sai.add(splatScene, 'rotate180');
+sai.open();
 
 let lightScene = new LightScene(options);
 scene.add(lightScene);
