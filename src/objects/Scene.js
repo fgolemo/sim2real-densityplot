@@ -1,6 +1,8 @@
 import {Group} from "three";
 import * as THREE from "three";
 
+const MAX_SPLATS = 20000;
+
 export default class SplatScene extends Group {
   constructor(options, renderMode) {
     super();
@@ -65,6 +67,19 @@ export default class SplatScene extends Group {
     }
   }
 
+  shortenSplats(splatList, samples) {
+    // let newList = [];
+    //
+    // for (let i = 0; i < splatList.length; i = i+2) {
+    //   newList.push(splatList[i]);
+    // }
+    //
+    // return newList;
+
+    const shuffled = splatList.sort(() => .5 - Math.random());
+    return shuffled.slice(0, samples);
+  }
+
   normalizeSplats(splatList) {
     let minX = 9999,
       minY = 9999,
@@ -73,6 +88,11 @@ export default class SplatScene extends Group {
       maxY = -9999,
       maxZ = -9999;
     let splats = [];
+
+    if (splatList.length > MAX_SPLATS) {
+      splatList = this.shortenSplats(splatList, MAX_SPLATS);
+    }
+
     splatList.forEach((line => {
       if (line.length === 0) {
         return;
@@ -228,7 +248,7 @@ export default class SplatScene extends Group {
     }
   }
 
-  rotateMesh180(mesh){
+  rotateMesh180(mesh) {
     mesh.rotateZ(Math.PI);
   }
 }
