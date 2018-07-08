@@ -1,71 +1,30 @@
 import {Group} from "three";
 import * as THREE from "three";
+import {FILES} from "../files";
 
 const MAX_SPLATS = 20000;
+const RADIUS = 0.75;
+
 
 export default class SplatScene extends Group {
-  constructor(options, renderMode) {
+  constructor(options) {
     super();
     this.options = options;
     this.meshesNorm = [];
     this.meshesLit = [];
-
-    this.oldRadius = this.options.disk.radius;
-    this.oldRendermode = this.options.rendering.mode;
-    this.oldBackground = this.options.rendering.background;
-
-    this.addBackground();
-    this.changeBackground();
-  }
-
-  makePlane(geo, mat, pos, rot) {
-    let plane = new THREE.Mesh(geo, mat);
-    plane.position.set(pos.x, pos.y, pos.z);
-    let normal = this.getNormal(pos, rot);
-    plane.lookAt(normal);
-    plane.castShadow = false;
-    plane.receiveShadow = true;
-    return plane
-  }
-
-  addBackground() {
-    let geometry = new THREE.PlaneGeometry(1, 1, 32, 32);
-    let material = new THREE.MeshLambertMaterial({color: 0xffffff, side: THREE.FrontSide});
-
-    let planeX = this.makePlane(geometry, material, {x: -0.5, y: 0, z: 0}, {x: 1, y: 0, z: 0});
-    this.add(planeX);
-
-    let planeY = this.makePlane(geometry, material, {x: 0, y: -0.5, z: 0}, {x: 0, y: 1, z: 0});
-    this.add(planeY);
-
-    let planeZ = this.makePlane(geometry, material, {x: 0, y: 0, z: -0.5}, {x: 0, y: 0, z: 1});
-    this.add(planeZ);
-
-    this.background = [planeX, planeY, planeZ];
+    this.file = -1;
 
   }
 
-  changeVisibility(scale, mode) {
-    this.turnAllOff();
-    if (mode === "normal") {
-      this.meshesNorm[scale].visible = true;
-    } else {
-      this.meshesLit[scale].visible = true;
-    }
-  }
-
-  changeBackground() {
-    this.background.forEach((bg => {
-      bg.visible = this.options.rendering.background;
-    }));
-  }
-
-  turnAllOff() {
-    for (let i in this.meshesNorm) {
-      this.meshesNorm[i].visible = false;
-      this.meshesLit[i].visible = false;
-    }
-  }
+  // makePlane(geo, mat, pos, rot) {
+  //   let plane = new THREE.Mesh(geo, mat);
+  //   plane.position.set(pos.x, pos.y, pos.z);
+  //   let normal = this.getNormal(pos, rot);
+  //   plane.lookAt(normal);
+  //   plane.castShadow = false;
+  //   plane.receiveShadow = true;
+  //   return plane
+  // }
 
   shortenSplats(splatList, samples) {
     // let newList = [];
@@ -98,7 +57,7 @@ export default class SplatScene extends Group {
         return;
       }
       let elements = line.split(" ");
-      if (elements.length === 6) {
+      if (elements.length === 4) {
         let elementsNum = [];
         for (let i in elements) {
           elementsNum.push(parseFloat(elements[i]));
@@ -138,117 +97,84 @@ export default class SplatScene extends Group {
       newY = -1 * newY;
       newX = -1 * newX;
 
-      splatsNormalized.push([newX, newY, newZ, line[3], line[4], line[5]]);
+      splatsNormalized.push([newX, newY, newZ, this.normalizeDensity(line[3])]);
     }));
 
     return splatsNormalized;
   }
 
   updateSplats(splatList) {
+    console.log("loading...");
+
+
     this.clearAllSplats();
 
     let geo = new THREE.Geometry();
     let normalizedSplats = this.normalizeSplats(splatList);
 
-    for (let i in this.options.splatSizes) {
-      normalizedSplats.forEach((line => {
-          let splat = this.createSplat(
-            line[0], line[1], line[2],
-            line[3], line[4], line[5],
-            this.options.splatSizes[i]
-          );
+    normalizedSplats.forEach((line => {
+        let splat = this.createSplat(
+          line[0], line[1], line[2],
+          line[3], RADIUS
+        );
 
-          geo.merge(splat);
-        }
-      ));
+        geo.merge(splat);
+      }
+    ));
 
-      let buf = new THREE.BufferGeometry().fromGeometry(geo);
-      let matNormal = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: THREE.FaceColors});
-      let matLit = new THREE.MeshLambertMaterial({color: 0x888888, side: THREE.DoubleSide});
+    let buf = new THREE.BufferGeometry().fromGeometry(geo);
+    let matNormal = new THREE.MeshBasicMaterial({side: THREE.DoubleSide, vertexColors: THREE.FaceColors});
+    let meshNormal = new THREE.Mesh(buf, matNormal);
+    //
+    meshNormal.rotateX(-Math.PI/2);
+    // meshNormal.rotateZ(Math.PI);
 
-      let meshNormal = new THREE.Mesh(buf, matNormal);
-      let meshLit = new THREE.Mesh(buf, matLit);
 
-      this.add(meshNormal);
-      this.add(meshLit);
-
-      this.meshesNorm[this.options.splatSizes[i].toString()] = meshNormal;
-      this.meshesLit[this.options.splatSizes[i].toString()] = meshLit;
-    }
+    this.add(meshNormal);
+    this.meshesNorm = meshNormal;
 
 
     console.log("loaded " + normalizedSplats.length + " splats");
-    this.changeVisibility(this.options.disk.radius, this.options.rendering.mode);
   }
 
-  createSplat(x, y, z, normX, normY, normZ, scale) {
-    let geometry = new THREE.CircleGeometry(0.005 * scale, 6);
-    geometry.lookAt(new THREE.Vector3(normX, normY, normZ));
+  createSplat(x, y, z, density, scale) {
+    let geometry = new THREE.SphereGeometry(0.005 * scale, 6, 6);
     geometry.translate(x, y, z);
 
     for (let i in geometry.faces) {
-      geometry.faces[i].color = this.normalToColor2(normX, normY, normZ);
+      geometry.faces[i].color = this.densityToColor(density);
     }
-    // splat.castShadow = true;
-    // splat.receiveShadow = false;
     return geometry;
   }
 
+  normalizeDensity(d) {
+    return (d - FILES[this.file].min) / (FILES[this.file].max - FILES[this.file].min);
+  }
+
   clearAllSplats() {
-    this.meshesNorm.forEach((mesh => this.remove(mesh)));
-    this.meshesLit.forEach((mesh => this.remove(mesh)));
-    this.meshesNorm = [];
-    this.meshesLit = [];
+    this.remove(this.meshesNorm);
+    this.meshesNorm = 0;
+
   }
 
-  rgb2hex(red, green, blue) {
-    let rgb = blue | (green << 8) | (red << 16);
-    return (0x1000000 + rgb)
+
+
+
+  heatMapColorforValue(value) {
+    let h = (1.0 - value)/1.5;
+    return [h, 1, 0.5];
   }
 
-  normalToColor(normX, normY, normZ) {
-    return this.rgb2hex(
-      Math.round(Math.abs(normX) * 255),
-      Math.round(Math.abs(normY) * 255),
-      Math.round(Math.abs(normZ) * 255)
-    )
-  }
-
-  normalToColor2(x, y, z) {
-    return new THREE.Color(Math.abs(x), Math.abs(y), Math.abs(z));
+  densityToColor(d) {
+    let hsl = this.heatMapColorforValue(d);
+    let color = new THREE.Color();
+    color.setHSL(hsl[0],hsl[1],hsl[2]);
+    return color;
   }
 
   update(timeStamp) {
     // this.rotation.y = timeStamp / 10000;
 
-    if (this.oldRadius !== this.options.disk.radius || this.oldRendermode !== this.options.rendering.mode) {
-      this.changeVisibility(this.options.disk.radius, this.options.rendering.mode);
-      this.oldRadius = this.options.disk.radius;
-      this.oldRendermode = this.options.rendering.mode;
-    }
-
-    if (this.oldBackground !== this.options.rendering.background) {
-      this.changeBackground();
-      this.oldBackground = this.options.rendering.background;
-    }
-
   }
 
-  getNormal(pos, normal) {
-    return new THREE.Vector3(
-      pos.x + normal.x,
-      pos.y + normal.y,
-      pos.z + normal.z)
-  }
-
-  rotate180() {
-    for (let i in this.meshesNorm) {
-      this.rotateMesh180(this.meshesNorm[i]);
-      this.rotateMesh180(this.meshesLit[i]);
-    }
-  }
-
-  rotateMesh180(mesh) {
-    mesh.rotateZ(Math.PI);
-  }
 }
